@@ -134,3 +134,6 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# своя модель пользователя (вход по email)
+AUTH_USER_MODEL = 'backend.User'
