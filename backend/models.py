@@ -59,3 +59,110 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+
+class Shop(models.Model):
+    """Магазин (поставщик)."""
+    name = models.CharField('Название', max_length=50)
+    # ссылка на файл с прайсом, откуда грузим товары
+    url = models.URLField('Ссылка на прайс', null=True, blank=True)
+    # у каждого магазина есть свой пользователь с типом shop
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True,
+                                related_name='shop', verbose_name='Пользователь')
+    # магазин может временно не принимать заказы
+    state = models.BooleanField('Принимает заказы', default=True)
+
+    class Meta:
+        verbose_name = 'Магазин'
+        verbose_name_plural = 'Магазины'
+        ordering = ('name',)
+
+    def __str__(self):
+        return self.name
+
+
+class Category(models.Model):
+    """Категория товаров. Одна категория может быть у нескольких магазинов."""
+    name = models.CharField('Название', max_length=50)
+    shops = models.ManyToManyField(Shop, related_name='categories', blank=True,
+                                   verbose_name='Магазины')
+
+    class Meta:
+        verbose_name = 'Категория'
+        verbose_name_plural = 'Категории'
+        ordering = ('name',)
+
+    def __str__(self):
+        return self.name
+
+
+class Product(models.Model):
+    """Товар в общем каталоге (без цены, цены у каждого магазина свои)."""
+    name = models.CharField('Название', max_length=100)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE,
+                                 related_name='products', verbose_name='Категория')
+
+    class Meta:
+        verbose_name = 'Товар'
+        verbose_name_plural = 'Товары'
+        ordering = ('name',)
+
+    def __str__(self):
+        return self.name
+
+
+class ProductInfo(models.Model):
+    """Товар в конкретном магазине: цена, остаток и т.д."""
+    product = models.ForeignKey(Product, on_delete=models.CASCADE,
+                                related_name='product_infos', verbose_name='Товар')
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE,
+                             related_name='product_infos', verbose_name='Магазин')
+    # id товара из файла магазина
+    external_id = models.PositiveIntegerField('Внешний id')
+    model = models.CharField('Модель', max_length=100, blank=True)
+    quantity = models.PositiveIntegerField('Количество')
+    price = models.PositiveIntegerField('Цена')
+    price_rrc = models.PositiveIntegerField('Рекомендуемая цена')
+
+    class Meta:
+        verbose_name = 'Информация о товаре'
+        verbose_name_plural = 'Информация о товарах'
+        # в одном магазине не может быть двух товаров с одним внешним id
+        constraints = [
+            models.UniqueConstraint(fields=['shop', 'external_id'], name='unique_shop_product'),
+        ]
+
+    def __str__(self):
+        return f'{self.product} ({self.shop})'
+
+
+class Parameter(models.Model):
+    """Название характеристики, например "Цвет" или "Диагональ"."""
+    name = models.CharField('Название', max_length=50)
+
+    class Meta:
+        verbose_name = 'Характеристика'
+        verbose_name_plural = 'Характеристики'
+        ordering = ('name',)
+
+    def __str__(self):
+        return self.name
+
+
+class ProductParameter(models.Model):
+    """Значение характеристики у конкретного товара в магазине."""
+    product_info = models.ForeignKey(ProductInfo, on_delete=models.CASCADE,
+                                     related_name='product_parameters', verbose_name='Товар в магазине')
+    parameter = models.ForeignKey(Parameter, on_delete=models.CASCADE,
+                                  related_name='product_parameters', verbose_name='Характеристика')
+    value = models.CharField('Значение', max_length=100)
+
+    class Meta:
+        verbose_name = 'Характеристика товара'
+        verbose_name_plural = 'Характеристики товаров'
+        constraints = [
+            models.UniqueConstraint(fields=['product_info', 'parameter'], name='unique_product_parameter'),
+        ]
+
+    def __str__(self):
+        return f'{self.parameter}: {self.value}'
